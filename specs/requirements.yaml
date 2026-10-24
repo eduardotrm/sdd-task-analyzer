@@ -1,0 +1,92 @@
+project: TaskAnalyzer
+
+objective: >
+  Módulo destinado à análise de tarefas para geração de métricas de produtividade,
+  seguindo estritamente o contrato SDD e as regras definidas em CONTEXT_RULES.md.
+
+public_interface:
+  exception:
+    name: TaskValidationError
+    purpose: Sinalizar dados de tarefa inválidos previstos no contrato.
+  function:
+    name: analyze_tasks
+    signature: "analyze_tasks(tasks: list[dict[str, object]]) -> dict[str, object]"
+
+input:
+  type: "list[dict[str, object]]"
+  task_fields:
+    id_tarefa:
+      type: int
+      constraints:
+        - inteiro
+        - positivo
+    data_criacao:
+      type: datetime
+    data_inicio:
+      type: datetime
+      optional: true
+    data_conclusao:
+      type: datetime
+      optional: true
+    prazo:
+      type: datetime
+    prioridade:
+      allowed_values:
+        - baixa
+        - media
+        - alta
+    status:
+      allowed_values:
+        - concluida
+        - pendente
+        - cancelada
+  date_rule: As datas devem ser tratadas de forma consistente e comparável.
+
+output:
+  type: "dict[str, object]"
+  fields:
+    total_tarefas: Quantidade total de tarefas recebidas.
+    total_concluidas: Quantidade de tarefas com status concluida.
+    total_pendentes: Quantidade de tarefas com status pendente.
+    tempo_medio_conclusao_horas: Média geral do tempo de conclusão das tarefas concluídas, em horas.
+    taxa_atraso_percentual: Percentual de tarefas concluídas após o prazo.
+    por_prioridade: Métricas agrupadas por prioridade, incluindo ao menos a média de tempo de conclusão.
+
+business_rules:
+  - O total de tarefas corresponde ao número de itens recebidos pela função.
+  - total_concluidas considera apenas tarefas com status concluida.
+  - total_pendentes considera apenas tarefas com status pendente.
+  - O tempo de conclusão deve ser calculado apenas para tarefas concluídas com os dados necessários para o cálculo.
+  - O tempo médio de conclusão deve ser expresso em horas.
+  - Uma tarefa é considerada atrasada quando data_conclusao for posterior ao prazo.
+  - Devem ser produzidas métricas por prioridade, incluindo o tempo médio de conclusão por prioridade.
+  - Se não houver tarefas concluídas, as médias relacionadas à conclusão devem retornar 0.0.
+  - Entradas vazias devem retornar métricas numéricas zeradas quando aplicável, sem exceções não previstas.
+  - Uma tarefa com data_conclusao anterior a data_criacao é inválida e deve disparar TaskValidationError.
+  - A implementação deve prevenir divisão por zero.
+  - Valores médios e percentuais devem ser retornados como números de ponto flutuante.
+
+acceptance_scenarios:
+  success:
+    given: Conjunto válido de tarefas concluídas e pendentes, com diferentes prioridades e prazos.
+    when: analyze_tasks for executada.
+    then: >
+      O resultado deve apresentar corretamente total_tarefas, total_concluidas,
+      total_pendentes, tempo_medio_conclusao_horas, taxa_atraso_percentual
+      e as métricas por prioridade.
+  error:
+    given: Uma tarefa em que data_conclusao < data_criacao.
+    when: analyze_tasks for executada.
+    then: Deve ser lançada TaskValidationError.
+  edge_cases:
+    - Lista de tarefas vazia.
+    - Lista contendo apenas tarefas pendentes.
+    - Ausência de tarefas concluídas para cálculo de médias.
+    - Nesses casos, evitar divisão por zero e retornar 0.0 para médias sem exceções não tratadas.
+
+restrictions:
+  python_version: ">=3.11"
+  type_hints: Todas as funções e parâmetros devem possuir type hints.
+  context_rules: O código deve respeitar integralmente CONTEXT_RULES.md.
+  persistence: Não deve haver persistência em arquivos ou banco de dados.
+  scope: Não devem ser adicionados comportamentos não previstos no contrato.
